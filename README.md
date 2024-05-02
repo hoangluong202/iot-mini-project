@@ -1,4 +1,4 @@
-# iot_flutter_demo
+# IOT-Mini-Project
 
 A new Flutter project.
 

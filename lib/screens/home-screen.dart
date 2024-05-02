@@ -1,11 +1,6 @@
-import 'dart:ffi';
-import 'dart:ui';
-
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/painting.dart';
-import 'package:flutter/rendering.dart';
-import 'package:flutter/widgets.dart';
+import 'package:get/get.dart';
+import 'package:iot_mini_project/services/mqtt.service.dart'; //
 
 class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key});
@@ -15,25 +10,76 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
-  bool _isSwitched = false;
+  late int _temperature = 40;
+  late int _humidity = 31;
 
-  void _incrementCounter() {
-    setState(() {
-      _counter++;
-    });
+  late bool _isAirConditioner = false;
+  late bool _isFridge = false;
+  late bool _isTelevision = false;
+  late bool _isWasher = false;
+
+  late MqttService mqttService;
+
+  @override
+  void initState() {
+    super.initState();
+    mqttService = MqttService(onMessage);
+    Get.put(mqttService);
   }
 
-  void _toggleSwitch(bool value) {
-    if (_isSwitched == false) {
+  void onMessage(String topic, String message) {
+    debugPrint('Received message: $message from topic: $topic');
+    if (topic == 'hl01012002/feeds/iot-mini-project.temp') {
       setState(() {
-        _isSwitched = true;
+        _temperature = int.parse(message);
       });
-    } else {
+    } else if (topic == 'hl01012002/feeds/iot-mini-project.humid') {
       setState(() {
-        _isSwitched = false;
+        _humidity = int.parse(message);
       });
     }
+  }
+
+  //
+
+  void _toggleAirConditioner(bool value) {
+    setState(() {
+      _isAirConditioner = value;
+    });
+    value
+        ? mqttService.publish(
+            'hl01012002/feeds/iot-mini-project.air-conditioner', '1')
+        : mqttService.publish(
+            'hl01012002/feeds/iot-mini-project.air-conditioner', '0');
+  }
+
+  void _toggleFridge(bool value) {
+    setState(() {
+      _isFridge = value;
+    });
+    value
+        ? mqttService.publish('hl01012002/feeds/iot-mini-project.fridge', '1')
+        : mqttService.publish('hl01012002/feeds/iot-mini-project.fridge', '0');
+  }
+
+  void _toggleTelevision(bool value) {
+    setState(() {
+      _isTelevision = value;
+    });
+    value
+        ? mqttService.publish(
+            'hl01012002/feeds/iot-mini-project.television', '1')
+        : mqttService.publish(
+            'hl01012002/feeds/iot-mini-project.television', '0');
+  }
+
+  void _toggleWasher(bool value) {
+    setState(() {
+      _isWasher = value;
+    });
+    value
+        ? mqttService.publish('hl01012002/feeds/iot-mini-project.washer', '1')
+        : mqttService.publish('hl01012002/feeds/iot-mini-project.washer', '0');
   }
 
   @override
@@ -132,16 +178,16 @@ class _MyHomePageState extends State<MyHomePage> {
                         Container(
                           width: 80,
                           height: 100,
-                          child: const Column(
+                          child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
-                              Text('41°',
-                                  style: TextStyle(
+                              Text('$_temperature' '°',
+                                  style: const TextStyle(
                                       fontSize: 18,
                                       fontWeight: FontWeight.w500,
                                       color: Colors.white)),
-                              Text('Sensible',
+                              const Text('Sensible',
                                   style: TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w500,
@@ -152,16 +198,16 @@ class _MyHomePageState extends State<MyHomePage> {
                         Container(
                           width: 80,
                           height: 100,
-                          child: const Column(
+                          child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
-                              Text('32%',
-                                  style: TextStyle(
+                              Text('$_humidity' '%',
+                                  style: const TextStyle(
                                       fontSize: 18,
                                       fontWeight: FontWeight.w500,
                                       color: Colors.white)),
-                              Text('Humidity',
+                              const Text('Humidity',
                                   style: TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w500,
@@ -214,10 +260,6 @@ class _MyHomePageState extends State<MyHomePage> {
                   ],
                 )),
             const SizedBox(height: 10),
-            // Text(
-            //   '$_counter',
-            //   style: Theme.of(context).textTheme.headlineMedium,
-            // ),
             Container(
               height: 60,
               child: ListView(
@@ -310,7 +352,7 @@ class _MyHomePageState extends State<MyHomePage> {
                             Row(children: [
                               Container(
                                 padding: const EdgeInsets.only(left: 8),
-                                child: Text(_isSwitched ? 'On' : 'Off',
+                                child: Text(_isAirConditioner ? 'On' : 'Off',
                                     style: const TextStyle(
                                         fontSize: 14,
                                         fontWeight: FontWeight.w500,
@@ -318,8 +360,10 @@ class _MyHomePageState extends State<MyHomePage> {
                               ),
                               const Spacer(),
                               Switch(
-                                value: _isSwitched,
-                                onChanged: _toggleSwitch,
+                                value: _isAirConditioner,
+                                onChanged: (value) {
+                                  _toggleAirConditioner(value);
+                                },
                               )
                             ])
                           ])),
@@ -349,7 +393,7 @@ class _MyHomePageState extends State<MyHomePage> {
                             Row(children: [
                               Container(
                                 padding: const EdgeInsets.only(left: 8),
-                                child: Text(_isSwitched ? 'On' : 'Off',
+                                child: Text(_isFridge ? 'On' : 'Off',
                                     style: const TextStyle(
                                         fontSize: 14,
                                         fontWeight: FontWeight.w500,
@@ -357,8 +401,10 @@ class _MyHomePageState extends State<MyHomePage> {
                               ),
                               const Spacer(),
                               Switch(
-                                value: _isSwitched,
-                                onChanged: _toggleSwitch,
+                                value: _isFridge,
+                                onChanged: (value) {
+                                  _toggleFridge(value);
+                                },
                               )
                             ])
                           ])),
@@ -391,7 +437,7 @@ class _MyHomePageState extends State<MyHomePage> {
                             Row(children: [
                               Container(
                                 padding: const EdgeInsets.only(left: 8),
-                                child: Text(_isSwitched ? 'On' : 'Off',
+                                child: Text(_isTelevision ? 'On' : 'Off',
                                     style: const TextStyle(
                                         fontSize: 14,
                                         fontWeight: FontWeight.w500,
@@ -399,8 +445,8 @@ class _MyHomePageState extends State<MyHomePage> {
                               ),
                               const Spacer(),
                               Switch(
-                                value: _isSwitched,
-                                onChanged: _toggleSwitch,
+                                value: _isTelevision,
+                                onChanged: _toggleTelevision,
                               )
                             ])
                           ])),
@@ -430,7 +476,7 @@ class _MyHomePageState extends State<MyHomePage> {
                             Row(children: [
                               Container(
                                 padding: const EdgeInsets.only(left: 8),
-                                child: Text(_isSwitched ? 'On' : 'Off',
+                                child: Text(_isWasher ? 'On' : 'Off',
                                     style: const TextStyle(
                                         fontSize: 14,
                                         fontWeight: FontWeight.w500,
@@ -438,8 +484,8 @@ class _MyHomePageState extends State<MyHomePage> {
                               ),
                               const Spacer(),
                               Switch(
-                                value: _isSwitched,
-                                onChanged: _toggleSwitch,
+                                value: _isWasher,
+                                onChanged: _toggleWasher,
                               )
                             ])
                           ]))
@@ -457,12 +503,11 @@ class _MyHomePageState extends State<MyHomePage> {
               height: 60,
               child: const Center(
                 child: Text('Add Device',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                  )
-                ),
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    )),
               ),
             ),
           ],
