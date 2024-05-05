@@ -10,19 +10,26 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  late int _temperature = 40;
-  late int _humidity = 31;
+  late int _temperature;
+  late int _humidity;
 
-  late bool _isAirConditioner = false;
-  late bool _isFridge = false;
-  late bool _isTelevision = false;
-  late bool _isWasher = false;
+  late bool _isAirConditioner;
+  late bool _isFridge;
+  late bool _isTelevision;
+  late bool _isWasher;
 
   late MqttService mqttService;
 
   @override
   void initState() {
     super.initState();
+    _temperature = 0;
+    _humidity = 0;
+    _isAirConditioner = false;
+    _isFridge = false;
+    _isTelevision = false;
+    _isWasher = false;
+
     mqttService = MqttService(onMessage);
     Get.put(mqttService);
   }
@@ -30,8 +37,23 @@ class _MyHomePageState extends State<MyHomePage> {
   void onMessage(String topic, String message) {
     debugPrint('Received message: $message from topic: $topic');
     if (topic == 'hl01012002/feeds/iot-mini-project.temp') {
+      final temperature = int.parse(message);
+      if (temperature > 33) {
+        mqttService.publish(
+            'hl01012002/feeds/iot-mini-project.air-conditioner', '1');
+        setState(() {
+          _isAirConditioner = true;
+        });
+      }
+      if (temperature < 25) {
+        mqttService.publish(
+            'hl01012002/feeds/iot-mini-project.air-conditioner', '0');
+        setState(() {
+          _isAirConditioner = false;
+        });
+      }
       setState(() {
-        _temperature = int.parse(message);
+        _temperature = temperature;
       });
     } else if (topic == 'hl01012002/feeds/iot-mini-project.humid') {
       setState(() {
@@ -57,6 +79,7 @@ class _MyHomePageState extends State<MyHomePage> {
     setState(() {
       _isFridge = value;
     });
+    // mqttService.getTheLastValue('hl01012002/feeds/iot-mini-project.temp');
     value
         ? mqttService.publish('hl01012002/feeds/iot-mini-project.fridge', '1')
         : mqttService.publish('hl01012002/feeds/iot-mini-project.fridge', '0');

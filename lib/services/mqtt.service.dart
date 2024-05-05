@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:mqtt_client/mqtt_client.dart';
@@ -8,10 +9,8 @@ import 'package:mqtt_client/mqtt_server_client.dart';
 
 class MqttService {
   //Readmore: https://pub.dev/packages/mqtt_client/example
-  static String hostName = 'io.adafruit.com';
-  static String clientId = '12345678';
-  final String username = 'hl01012002';
-  final String password = dotenv.env['ADAFRUIT_IO_KEY']!;
+  late MqttServerClient client;
+
   final List<String> pubTopics = [
     "hl01012002/feeds/iot-mini-project.air-conditioner",
     "hl01012002/feeds/iot-mini-project.fridge",
@@ -23,19 +22,70 @@ class MqttService {
     "hl01012002/feeds/iot-mini-project.humid"
   ];
 
-  final MqttServerClient client = MqttServerClient(hostName, clientId);
+  final String clientId = 'RMX3357';
+  final String username = 'hl01012002';
+  final String password = dotenv.env['ADAFRUIT_IO_KEY']!;
 
-  final Function(String, String) onMessage;
+  final String hostName = 'io.adafruit.com';
+
+  //constructor
+  MqttService(Function(String, String) onMessageReceived) {
+    _loadEnv();
+    client = MqttServerClient(hostName, clientId);
+    client.logging(on: true);
+    client.setProtocolV311();
+    client.keepAlivePeriod = 20;
+    client.connectTimeoutPeriod = 2000;
+    client.onConnected = onConnected;
+    client.onSubscribed = onSubscribed;
+    client.onDisconnected = onDisconnected;
+
+    final connMess = MqttConnectMessage()
+        .withClientIdentifier('Mqtt_MyClientUniqueId')
+        .withWillTopic(
+            'willtopic') // If you set this you must set a will message
+        .withWillMessage('My Will message')
+        .startClean() // Non persistent session for testing
+        .withWillQos(MqttQos.atLeastOnce);
+    print('EXAMPLE::Mosquitto client connecting....');
+    client.connectionMessage = connMess;
+
+    connect();
+
+    //callback when message received
+    client.updates!.listen((List<MqttReceivedMessage<MqttMessage?>>? c) {
+      final recMess = c![0].payload as MqttPublishMessage;
+      final pt =
+          MqttPublishPayload.bytesToStringAsString(recMess.payload.message);
+      onMessageReceived(c[0].topic, pt);
+    });
+  }
 
   //Connect to Adafruit
   Future<void> connect() async {
     try {
       await client.connect(username, password);
-      subscribe();
-    } catch (e) {
-      debugPrint('EXAMPLE::client exception - $e');
+    } on NoConnectionException catch (e) {
+      // Raised by the client when connection fails.
+      debugPrint('ERROR::client exception - $e');
+      client.disconnect();
+    } on SocketException catch (e) {
+      // Raised by the socket layer
+      debugPrint('ERROR::socket exception - $e');
       client.disconnect();
     }
+
+    if (client.connectionStatus!.state == MqttConnectionState.connected) {
+      debugPrint('DONE::Mosquitto client connected');
+    } else {
+      /// Use status here rather than state if you also want the broker return code.
+      debugPrint(
+          'ERROR Mosquitto client connection failed - disconnecting, status is ${client.connectionStatus}');
+      client.disconnect();
+      exit(-1);
+    }
+
+    subscribe();
   }
 
   Future<void> _loadEnv() async {
@@ -49,65 +99,24 @@ class MqttService {
     }
   }
 
-  //
-  void handleMessage() {
-    client.updates!.listen((List<MqttReceivedMessage<MqttMessage?>>? c) {
-      final recMess = c![0].payload as MqttPublishMessage;
-      final pt =
-          MqttPublishPayload.bytesToStringAsString(recMess.payload.message);
-      debugPrint(
-          'Change notification:: topic is <${c[0].topic}>, payload is <-- $pt -->');
-    });
-  }
-
   // callback when connected
   void onConnected() {
-    debugPrint('connected successfully');
+    debugPrint('DONE::Mosquitto client connected');
   }
 
   //callback when disconnected
   void onDisconnected() {
-    print('disconnected');
+    print('END::Mosquitto client disconnected');
   }
 
   //callback when subscribed
   void onSubscribed(String topic) {
-    print('subscribed on topic: $topic');
+    print('DONE::: Sunscribe successfully $topic');
   }
 
   void publish(String pubTopic, String message) {
     final builder = MqttClientPayloadBuilder();
     builder.addString(message);
     client.publishMessage(pubTopic, MqttQos.exactlyOnce, builder.payload!);
-  }
-
-//GET LAST VALUE IN A TOPIC
-  void getTheLastValue(String topic) {
-   
-    
-  }
-
-  //constructor
-  MqttService(this.onMessage) {
-    _loadEnv();
-    connect();
-    client.logging(on: true);
-    client.setProtocolV311();
-    client.keepAlivePeriod = 3600;
-    //call back when connected
-    client.onConnected = onConnected;
-    //call back when subscribed
-    client.onSubscribed = onSubscribed;
-    //call back when disconnected
-    client.onDisconnected = onDisconnected;
-    //callback when message received
-    client.updates!.listen((List<MqttReceivedMessage<MqttMessage?>>? c) {
-      final recMess = c![0].payload as MqttPublishMessage;
-      final pt =
-          MqttPublishPayload.bytesToStringAsString(recMess.payload.message);
-      debugPrint(
-          'Change notification:: topic is <${c[0].topic}>, payload is <-- $pt -->');
-      onMessage(c[0].topic, pt);
-    });
   }
 }
